@@ -5,11 +5,25 @@ description: "米国の主要経済指標(FOMC・ISM・雇用統計・CPI・PPI�
 
 # register-indicators
 
-対象月の米国経済指標の発表日時を公式ソースで確認し、Google カレンダーの「米経済指標」カレンダーに登録する。Notion Calendar は Google カレンダーを表示しているので、そこにも出る。
+対象月の米国経済指標の発表日時を公式ソースで確認し、Google カレンダーの「米経済指標」カレンダーに gogcli(`gog`)で登録する。Notion Calendar は Google カレンダーを表示しているので、そこにも出る。
+
+## 前提条件
+
+- Vault ルートの `config.json`(git 追跡外)に `google_account` と `calendar_id` が設定済み(`config.example.json` 参照)
+- `gog` がそのアカウントで認証済み(calendar スコープ込み)で、Google Cloud 側で Calendar API が有効
+- gog の keyring パスワードが macOS キーチェーンにサービス名 `gogcli-keyring` で登録済み:
+  ```bash
+  security add-generic-password -a "$USER" -s gogcli-keyring -w
+  ```
+
+gog は必ずラッパー経由で呼ぶ(アカウント指定とパスワード受け渡しをまとめてやる):
+```bash
+.claude/skills/register-indicators/scripts/gog.sh calendar ...
+```
 
 ## 対象指標と公式ソース
 
-時刻は米国東部時間(ET)。カレンダーには `timeZone: America/New_York` で登録するので、日本時間への変換と夏時間・冬時間の切り替えは Google カレンダーに任せる。
+時刻は米国東部時間(ET)。カレンダーには ET のオフセット付き時刻と `--timezone America/New_York` で登録するので、日本時間への変換と夏時間・冬時間の切り替えは Google カレンダーに任せる。
 
 | 予定名 | 発表日の目安 | 時刻(ET) | 公式ソース |
 |---|---|---|---|
@@ -35,22 +49,27 @@ description: "米国の主要経済指標(FOMC・ISM・雇用統計・CPI・PPI�
    - 「発表日の目安」で日付を推測して登録しない。公式ソースで日付を確認できなかった指標は、登録せずにユーザーに報告する
    - 政府機関の閉鎖などで予定が変わっていないかも確認する
 
-3. `list_calendars` で「米経済指標」カレンダーの ID を取得する
-   - 見つからなければ、Google カレンダーで「米経済指標」という名前のカレンダーを作るようユーザーに依頼して終了する(MCP からはカレンダーを作成できない)
+3. `config.json` から `calendar_id` を読み、対象月の既存予定を取得する。同じ日付・同じ予定名のものは登録済みとして飛ばす:
+   ```bash
+   .claude/skills/register-indicators/scripts/gog.sh calendar events <calendar_id> \
+     --from 2026-11-01 --to 2026-12-01 --all-pages -j
+   ```
 
-4. `list_events` で、そのカレンダーにある対象月の既存予定を取得する。同じ日付・同じ予定名のものは登録済みとして飛ばす
+4. 登録内容を一覧にしてユーザーに確認する(日本時間も併記する)
 
-5. 登録内容を一覧にしてユーザーに確認する(日本時間も併記する)
+5. OK が出たら1件ずつ登録する:
+   ```bash
+   .claude/skills/register-indicators/scripts/gog.sh calendar create <calendar_id> \
+     --summary "🇺🇸 雇用統計" \
+     --from 2026-11-06T08:30:00-05:00 --to 2026-11-06T08:45:00-05:00 \
+     --timezone America/New_York \
+     --transparency transparent \
+     --description "<確認した公式ソースの URL>"
+   ```
+   - ET のオフセットは夏時間(3月第2日曜〜11月第1日曜)なら `-04:00`、冬時間なら `-05:00`
+   - 予定の長さは15分
 
-6. OK が出たら `create_event` で1件ずつ登録する
-   - `calendarId`: 手順3の ID
-   - `summary`: `🇺🇸 <予定名>`(例: `🇺🇸 雇用統計`)
-   - `startTime`: 発表時刻、`endTime`: 15分後
-   - `timeZone`: `America/New_York`
-   - `availability`: `AVAILABILITY_FREE`
-   - `description`: 確認した公式ソースの URL
-
-7. `指標/YYYY-MM.md` を作成(既にあれば上書き)して、日付順の表にまとめる:
+6. `指標/YYYY-MM.md` を作成(既にあれば上書き)して、日付順の表にまとめる:
    ```markdown
    # 2026-10 米経済指標
 
@@ -60,7 +79,7 @@ description: "米国の主要経済指標(FOMC・ISM・雇用統計・CPI・PPI�
    ```
    日本時間は夏時間(3月第2日曜〜11月第1日曜)なら ET+13時間、冬時間なら ET+14時間で計算する
 
-8. 登録した件数・飛ばした件数・確認できなかった指標を報告する
+7. 登録した件数・飛ばした件数・確認できなかった指標を報告する
 
 ## 注意点
 

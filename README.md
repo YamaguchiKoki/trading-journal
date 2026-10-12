@@ -18,4 +18,9 @@
 
 公式スケジュールで発表日時を確認し、Google カレンダーの「米経済指標」カレンダー(Notion Calendar にも表示される)に登録して、`指標/YYYY-MM.md` にまとめる。
 
-事前準備: Google カレンダーで「米経済指標」カレンダーを作成し、Claude Code から Google Calendar コネクタを使えるようにしておく。
+事前準備:
+
+1. gogcli を認証し(`gog auth add <email>`)、Google Cloud で Calendar API を有効化
+2. `gog -a <email> calendar create-calendar "米経済指標"` でカレンダーを作成
+3. `config.example.json` を `config.json` にコピーし、アカウントと手順2のカレンダー ID を設定
+4. gog の keyring パスワードをキーチェーンに登録: `security add-generic-password -a "$USER" -s gogcli-keyring -w`
